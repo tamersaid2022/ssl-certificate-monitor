@@ -1,0 +1,69 @@
+# ============================================================================
+# SSL/TLS Certificate Monitor - Configuration
+# Author: Tamer Khalifa (CCIE #68867)
+# ============================================================================
+
+---
+scanning:
+  timeout: 10
+  retries: 2
+  threads: 20
+  ports: [443, 8443, 636, 993, 995, 587, 465]
+
+thresholds:
+  critical: 7        # days before expiry
+  warning: 30
+  notice: 60
+  info: 90
+
+compliance:
+  min_protocol: "TLSv1.2"
+  min_key_size: 2048
+  prohibited_ciphers:
+    - RC4
+    - DES
+    - 3DES
+    - MD5
+    - NULL
+    - EXPORT
+  required_extensions:
+    - subjectAltName
+    - basicConstraints
+
+ssl_inspection:
+  known_issuers:
+    - "Palo Alto Networks"
+    - "Zscaler"
+    - "Fortinet"
+    - "Blue Coat"
+    - "Symantec"
+    - "Check Point"
+    - "Cisco Umbrella"
+    - "Sophos"
+    - "Barracuda"
+    - "Untangle"
+
+alerting:
+  email:
+    enabled: false
+    smtp_server: "smtp.company.com"
+    smtp_port: 587
+    use_tls: true
+    username: "${SMTP_USER}"
+    password: "${SMTP_PASS}"
+    from_address: "ssl-monitor@company.com"
+    recipients:
+      - "netops@company.com"
+      - "security@company.com"
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK}"
+    channel: "#certificate-alerts"
+  teams:
+    enabled: false
+    webhook_url: "${TEAMS_WEBHOOK}"
+
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  secret_key: "${FLASK_SECRET_KEY}"

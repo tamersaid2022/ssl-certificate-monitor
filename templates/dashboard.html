@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSL/TLS Certificate Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🔒</span>
+                <h1 class="text-xl font-bold">SSL/TLS Certificate Monitor</h1>
+                <span class="bg-green-600 text-xs px-2 py-1 rounded-full pulse">● Monitoring</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm transition">
+                    🔄 Refresh
+                </button>
+                <button onclick="checkNew()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition">
+                    ➕ Check Host
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
+            <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700 hover:border-blue-500 transition">
+                <div class="text-3xl font-bold text-blue-400" id="stat-total">--</div>
+                <div class="text-xs text-gray-400 mt-1">Total Monitored</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700 hover:border-green-500 transition">
+                <div class="text-3xl font-bold text-green-400" id="stat-healthy">--</div>
+                <div class="text-xs text-gray-400 mt-1">Healthy</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700 hover:border-yellow-500 transition">
+                <div class="text-3xl font-bold text-yellow-400" id="stat-warning">--</div>
+                <div class="text-xs text-gray-400 mt-1">Warning</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700 hover:border-red-500 transition">
+                <div class="text-3xl font-bold text-red-400" id="stat-critical">--</div>
+                <div class="text-xs text-gray-400 mt-1">Critical / Expired</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700 hover:border-purple-500 transition">
+                <div class="text-3xl font-bold text-purple-400" id="stat-inspected">--</div>
+                <div class="text-xs text-gray-400 mt-1">SSL Inspected</div>
+            </div>
+            <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700 hover:border-orange-500 transition">
+                <div class="text-3xl font-bold text-orange-400" id="stat-noncompliant">--</div>
+                <div class="text-xs text-gray-400 mt-1">Non-Compliant</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-gray-800 rounded-lg border border-gray-700 px-6 py-4 mb-6 flex flex-wrap gap-4 items-center">
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400">Search:</label>
+                <input type="text" id="search" placeholder="Host, issuer, subject..."
+                       class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-64"
+                       oninput="filterTable()">
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400">Status:</label>
+                <select id="filter-status" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm"
+                        onchange="filterTable()">
+                    <option value="all">All</option>
+                    <option value="healthy">Healthy</option>
+                    <option value="warning">Warning / Notice</option>
+                    <option value="critical">Critical / Expired</option>
+                    <option value="inspected">SSL Inspected</option>
+                    <option value="noncompliant">Non-Compliant</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400">Sort:</label>
+                <select id="sort-by" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm"
+                        onchange="sortTable()">
+                    <option value="days-asc">Expiry (soonest first)</option>
+                    <option value="days-desc">Expiry (latest first)</option>
+                    <option value="host-asc">Host (A-Z)</option>
+                    <option value="host-desc">Host (Z-A)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Certificate Table -->
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-750">
+                    <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
+                        <th class="px-4 py-3">Host</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Subject</th>
+                        <th class="px-4 py-3">Issuer</th>
+                        <th class="px-4 py-3">Expires</th>
+                        <th class="px-4 py-3">Days Left</th>
+                        <th class="px-4 py-3">Protocol</th>
+                        <th class="px-4 py-3">SSL Inspect</th>
+                        <th class="px-4 py-3">PCI</th>
+                    </tr>
+                </thead>
+                <tbody id="cert-table">
+                    <tr>
+                        <td colspan="9" class="px-4 py-12 text-center text-gray-500">
+                            <div class="pulse">Loading certificates...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-gray-600 mt-8 text-sm">
+            SSL/TLS Certificate Monitor | Author: Tamer Khalifa (CCIE #68867) |
+            Last refresh: <span id="last-refresh">--</span>
+        </div>
+    </main>
+
+    <!-- Check Host Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 w-96">
+            <h2 class="text-lg font-bold mb-4">Check New Host</h2>
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Hostname</label>
+                <input type="text" id="new-host" placeholder="example.com"
+                       class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Port</label>
+                <input type="number" id="new-port" value="443"
+                       class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-600 rounded text-sm hover:bg-gray-500">Cancel</button>
+                <button onclick="submitCheck()" class="px-4 py-2 bg-blue-600 rounded text-sm hover:bg-blue-700">Check</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allCerts = [];
+
+        // Load data
+        async function refreshData() {
+            try {
+                const resp = await fetch('/api/certificates');
+                const data = await resp.json();
+                allCerts = data.certificates || [];
+                updateStats();
+                renderTable();
+                document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();
+            } catch (err) {
+                console.error('Failed to load certificates:', err);
+            }
+        }
+
+        function updateStats() {
+            let healthy = 0, warning = 0, critical = 0, inspected = 0, noncompliant = 0;
+            allCerts.forEach(c => {
+                if (c.severity === 'healthy') healthy++;
+                if (c.severity === 'warning' || c.severity === 'notice') warning++;
+                if (c.severity === 'critical' || c.severity === 'expired') critical++;
+                if (c.is_intercepted) inspected++;
+                if (!c.compliance_pci || !c.compliance_nist) noncompliant++;
+            });
+            document.getElementById('stat-total').textContent = allCerts.length;
+            document.getElementById('stat-healthy').textContent = healthy;
+            document.getElementById('stat-warning').textContent = warning;
+            document.getElementById('stat-critical').textContent = critical;
+            document.getElementById('stat-inspected').textContent = inspected;
+            document.getElementById('stat-noncompliant').textContent = noncompliant;
+        }
+
+        function renderTable(certs) {
+            certs = certs || allCerts;
+            const tbody = document.getElementById('cert-table');
+
+            if (certs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">No certificates found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = certs.map(c => {
+                const statusColors = {
+                    'healthy': 'bg-green-600',
+                    'notice': 'bg-yellow-600',
+                    'warning': 'bg-orange-600',
+                    'critical': 'bg-red-600',
+                    'expired': 'bg-red-800'
+                };
+                const sc = statusColors[c.severity] || 'bg-gray-600';
+
+                return `
+                <tr class="border-b border-gray-700 hover:bg-gray-750 fade-in">
+                    <td class="px-4 py-3 font-mono text-sm">${c.host}:${c.port}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${sc}">
+                            ${c.severity.toUpperCase()}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">${c.subject || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-400">${c.issuer || '-'}</td>
+                    <td class="px-4 py-3 text-sm">${c.not_after ? c.not_after.slice(0, 10) : '-'}</td>
+                    <td class="px-4 py-3 font-bold ${c.days_remaining <= 7 ? 'text-red-400' : c.days_remaining <= 30 ? 'text-yellow-400' : 'text-green-400'}">
+                        ${c.days_remaining}
+                    </td>
+                    <td class="px-4 py-3 text-sm">${c.protocol_version || '-'}</td>
+                    <td class="px-4 py-3 text-sm">${c.is_intercepted ? '⚠️ ' + c.intercepted_by : '✅ No'}</td>
+                    <td class="px-4 py-3">${c.compliance_pci ? '✅' : '❌'}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function filterTable() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const status = document.getElementById('filter-status').value;
+
+            let filtered = allCerts.filter(c => {
+                const matchSearch = !search ||
+                    c.host.toLowerCase().includes(search) ||
+                    (c.subject || '').toLowerCase().includes(search) ||
+                    (c.issuer || '').toLowerCase().includes(search);
+
+                let matchStatus = true;
+                if (status === 'healthy') matchStatus = c.severity === 'healthy';
+                if (status === 'warning') matchStatus = c.severity === 'warning' || c.severity === 'notice';
+                if (status === 'critical') matchStatus = c.severity === 'critical' || c.severity === 'expired';
+                if (status === 'inspected') matchStatus = c.is_intercepted;
+                if (status === 'noncompliant') matchStatus = !c.compliance_pci || !c.compliance_nist;
+
+                return matchSearch && matchStatus;
+            });
+
+            sortCerts(filtered);
+            renderTable(filtered);
+        }
+
+        function sortTable() {
+            filterTable();
+        }
+
+        function sortCerts(certs) {
+            const sortBy = document.getElementById('sort-by').value;
+            certs.sort((a, b) => {
+                if (sortBy === 'days-asc') return a.days_remaining - b.days_remaining;
+                if (sortBy === 'days-desc') return b.days_remaining - a.days_remaining;
+                if (sortBy === 'host-asc') return a.host.localeCompare(b.host);
+                if (sortBy === 'host-desc') return b.host.localeCompare(a.host);
+                return 0;
+            });
+        }
+
+        function checkNew() {
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        async function submitCheck() {
+            const host = document.getElementById('new-host').value;
+            const port = parseInt(document.getElementById('new-port').value) || 443;
+            if (!host) return;
+
+            closeModal();
+            try {
+                const resp = await fetch('/api/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host, port })
+                });
+                await refreshData();
+            } catch (err) {
+                console.error('Check failed:', err);
+            }
+        }
+
+        // Initial load
+        refreshData();
+
+        // Auto-refresh every 5 minutes
+        setInterval(refreshData, 300000);
+    </script>
+</body>
+</html>

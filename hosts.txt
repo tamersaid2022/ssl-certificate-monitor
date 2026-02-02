@@ -1,0 +1,33 @@
+# ============================================================================
+# SSL/TLS Certificate Monitor - Hosts File
+# Author: Tamer Khalifa (CCIE #68867)
+# ============================================================================
+# Format: hostname or hostname:port (default port: 443)
+# Lines starting with # are ignored
+# ============================================================================
+
+# ── External Services ────────────────────────────────────────────
+google.com
+github.com
+amazon.com
+cloudflare.com
+microsoft.com
+
+# ── Internal Services (replace with your hosts) ─────────────────
+# mail.company.com
+# vpn.company.com:443
+# portal.company.com:8443
+# ldap.company.com:636
+# imap.company.com:993
+# pop3.company.com:995
+# smtp.company.com:587
+
+# ── Web Applications ────────────────────────────────────────────
+# app.company.com
+# api.company.com
+# dashboard.company.com
+
+# ── Infrastructure ──────────────────────────────────────────────
+# firewall.company.com
+# switch-mgmt.company.com
+# vcenter.company.com

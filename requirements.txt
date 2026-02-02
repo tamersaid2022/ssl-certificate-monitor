@@ -1,0 +1,36 @@
+# ============================================================================
+# SSL/TLS Certificate Monitor - Dependencies
+# Author: Tamer Khalifa (CCIE #68867)
+# Install: pip install -r requirements.txt
+# ============================================================================
+
+# Core - Certificate Parsing
+cryptography>=41.0.0
+pyOpenSSL>=23.0.0
+
+# Web Framework
+flask>=3.0.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# Configuration
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Data Export
+pandas>=2.0.0
+openpyxl>=3.1.0
+jinja2>=3.1.0
+
+# Terminal UI
+rich>=13.0.0
+
+# Scheduling
+apscheduler>=3.10.0
+
+# Date Utilities
+python-dateutil>=2.8.0
+
+# MAC/Vendor Lookup (optional)
+mac-vendor-lookup>=0.1.12

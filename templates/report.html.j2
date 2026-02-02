@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSL/TLS Certificate Report - {{ scan_date }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-7xl mx-auto">
+
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">🔒 SSL/TLS Certificate Report</h1>
+            <p class="text-gray-500">Generated: {{ scan_date }}</p>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mt-6">
+                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-blue-600">{{ total }}</div>
+                    <div class="text-sm text-gray-600">Total</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-green-600">{{ healthy }}</div>
+                    <div class="text-sm text-gray-600">Healthy</div>
+                </div>
+                <div class="bg-yellow-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-yellow-600">{{ warning }}</div>
+                    <div class="text-sm text-gray-600">Warning</div>
+                </div>
+                <div class="bg-red-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-red-600">{{ critical }}</div>
+                    <div class="text-sm text-gray-600">Critical</div>
+                </div>
+                <div class="bg-red-100 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-red-700">{{ expired }}</div>
+                    <div class="text-sm text-gray-600">Expired</div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-purple-600">{{ inspected }}</div>
+                    <div class="text-sm text-gray-600">SSL Inspected</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attention Required -->
+        {% if problems %}
+        <div class="bg-red-50 border border-red-200 rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-red-800 mb-4">⚠️ Attention Required ({{ problems | length }})</h2>
+            <div class="space-y-2">
+                {% for cert in problems %}
+                <div class="flex items-center gap-3 p-3 bg-white rounded border border-red-100">
+                    {% if cert.severity == 'expired' %}
+                        <span class="text-red-600 font-bold">❌</span>
+                    {% elif cert.severity == 'critical' %}
+                        <span class="text-red-500 font-bold">🔴</span>
+                    {% else %}
+                        <span class="text-orange-500 font-bold">🟠</span>
+                    {% endif %}
+                    <span class="font-mono text-sm">{{ cert.host }}:{{ cert.port }}</span>
+                    <span class="text-gray-600">{{ cert.subject }}</span>
+                    <span class="ml-auto font-bold {{ 'text-red-600' if cert.days_remaining <= 0 else 'text-orange-600' }}">
+                        {% if cert.days_remaining <= 0 %}
+                            Expired {{ cert.days_remaining | abs }} days ago
+                        {% else %}
+                            {{ cert.days_remaining }} days left
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- SSL Inspected -->
+        {% if inspected_certs %}
+        <div class="bg-purple-50 border border-purple-200 rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-purple-800 mb-4">🔍 SSL Inspected Certificates ({{ inspected_certs | length }})</h2>
+            <div class="space-y-2">
+                {% for cert in inspected_certs %}
+                <div class="flex items-center gap-3 p-3 bg-white rounded border border-purple-100">
+                    <span>⚠️</span>
+                    <span class="font-mono text-sm">{{ cert.host }}:{{ cert.port }}</span>
+                    <span class="text-gray-600">Inspected by: <strong>{{ cert.intercepted_by }}</strong></span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Full Certificate Table -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="px-6 py-4 border-b">
+                <h2 class="text-xl font-bold text-gray-800">All Certificates</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-800 text-white">
+                        <tr>
+                            <th class="px-4 py-3 text-left">Host</th>
+                            <th class="px-4 py-3 text-left">Status</th>
+                            <th class="px-4 py-3 text-left">Subject</th>
+                            <th class="px-4 py-3 text-left">Issuer</th>
+                            <th class="px-4 py-3 text-left">Expires</th>
+                            <th class="px-4 py-3 text-left">Days</th>
+                            <th class="px-4 py-3 text-left">Key</th>
+                            <th class="px-4 py-3 text-left">Protocol</th>
+                            <th class="px-4 py-3 text-left">SSL Inspect</th>
+                            <th class="px-4 py-3 text-left">PCI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for cert in certificates %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-mono text-sm">{{ cert.host }}:{{ cert.port }}</td>
+                            <td class="px-4 py-3">
+                                {% set colors = {
+                                    'healthy': 'bg-green-100 text-green-800',
+                                    'notice': 'bg-yellow-100 text-yellow-800',
+                                    'warning': 'bg-orange-100 text-orange-800',
+                                    'critical': 'bg-red-100 text-red-800',
+                                    'expired': 'bg-red-200 text-red-900'
+                                } %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {{ colors.get(cert.severity, 'bg-gray-100') }}">
+                                    {{ cert.severity | upper }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm">{{ cert.subject or '-' }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-500">{{ cert.issuer or '-' }}</td>
+                            <td class="px-4 py-3 text-sm">{{ cert.not_after.strftime('%Y-%m-%d') if cert.not_after else '-' }}</td>
+                            <td class="px-4 py-3 font-bold">{{ cert.days_remaining }}</td>
+                            <td class="px-4 py-3 text-sm">{{ cert.key_type }} {{ cert.key_size }}</td>
+                            <td class="px-4 py-3 text-sm">{{ cert.protocol_version or '-' }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                {% if cert.is_intercepted %}
+                                    ⚠️ {{ cert.intercepted_by }}
+                                {% else %}
+                                    ✅ No
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">{{ '✅' if cert.compliance_pci else '❌' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-gray-500 mt-8 text-sm">
+            Generated by SSL/TLS Certificate Monitor | Author: Tamer Khalifa (CCIE #68867)
+        </div>
+    </div>
+</body>
+</html>
